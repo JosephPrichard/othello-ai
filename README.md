@@ -1,2 +1,2 @@
-# OthelloEngine
-A high-performance Othello engine powered by a Minimax algorithm.
+# OthelloAI
+Minimax implementation of an Othello AI.
