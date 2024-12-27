@@ -1,7 +1,7 @@
 # OthelloAI
 Minimax implementation of an Othello AI.
 
-This is a rewrite of my Java OthelloBot engine in Rust for the purpose of learning Rust and related performance techniques.
+This is a rewrite of my Java OthelloBot engine for the purpose of learning Rust.
 
 ## CLI
 
@@ -13,7 +13,7 @@ ex: `a5` means col 1, row 5.
 Boards are given in a format similar to FEN.
 ex: `8E/8E/8E/3EBW3E/3EWB3E/8E/8E/8E/B` would be the start state for a given othello board.
 
-Board arguments are generally optional and default to using a global board if not provided.
+Board arguments are optional and default to using a global board if not provided.
 
 `$ quit`
 
@@ -22,6 +22,10 @@ Close the bot and wipe any active state/caches.
 `$ move <move> <board?>`
 
 Make a move on the board with the given move.
+
+`$ view`
+
+View the current board state that can be interacted with using defaulted commands.
 
 `$ moves <board?>`
 
