@@ -2,7 +2,7 @@
  * Copyright (c) Joseph Prichard 2022.
  */
 
-use std::mem;
+use std::{io::BufWriter, io::Write, mem};
 
 const CACHE_SIZE: usize = (2i32.pow(12) + 1) as usize;
 
@@ -89,22 +89,24 @@ impl TranspositionTable {
     }
 
     pub fn dump(&self) {
-        eprintln!("Debug Cache");
+        let stderr = std::io::stderr().lock();
+        let mut bw = BufWriter::new(stderr);
+
+        write!(bw, "Debug Cache").unwrap();
+
         for cache_line in self.cache.iter() {
-            let dump_str = &mut String::new();
             match &cache_line[0] {
                 Some(node) => {
-                    dump_str.push_str(&format!("Slot1 {} {} {} ", node.key, node.heuristic, node.depth))
+                    write!(bw, "Slot1 {} {} {} ", node.key, node.heuristic, node.depth).unwrap()
                 },
-                None => dump_str.push_str("Slot1 Empty ")
+                None => write!(bw, "Slot1 Empty ").unwrap()
             };
             match &cache_line[1] {
                 Some(node) => {
-                    dump_str.push_str(&format!("Slot2 {} {} {}", node.key, node.heuristic, node.depth))
+                    writeln!(bw, "Slot2 {} {} {}", node.key, node.heuristic, node.depth).unwrap()
                 },
-                None => dump_str.push_str("Slot2 Empty")
+                None => writeln!(bw, "Slot2 Empty").unwrap()
             };
-            eprintln!("{}", dump_str);
         }
     }
 

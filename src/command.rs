@@ -3,6 +3,7 @@
  */
 
 use std::process::exit;
+use std::sync::LazyLock;
 use crate::agent::{AgentConfig, OthelloAgent};
 use crate::board::OthelloBoard;
 use crate::errors::{ParseResult, ParseError};
@@ -12,7 +13,8 @@ const MAX_LEVEL: usize = 6;
 
 pub struct CommandHandler {
     agents: Vec<Option<OthelloAgent>>,
-    configs: Vec<AgentConfig>
+    configs: Vec<AgentConfig>,
+    current_board: OthelloBoard,
 }
 
 impl CommandHandler  {
@@ -21,6 +23,7 @@ impl CommandHandler  {
         for _ in 0..MAX_LEVEL {
             agents.push(None);
         }
+
         let configs = vec![
             AgentConfig::new(2),
             AgentConfig::new(3),
@@ -29,7 +32,7 @@ impl CommandHandler  {
             AgentConfig::new(10),
             AgentConfig::new(15),
         ];
-        Self { agents, configs }
+        Self { agents, configs, current_board: OthelloBoard::new() }
     }
 
     fn get_optional_agent(&mut self, valid_level: usize) -> &mut Option<OthelloAgent>  {
@@ -62,17 +65,16 @@ impl CommandHandler  {
     }
 
     fn handle_command(&mut self, command_str: &str) -> ParseResult<String> {
-        // extract the buffer into a string split by space
         let tokens = command_str.split(" ").collect::<Vec<&str>>();
-        // input must contain at least one token
+ 
         if tokens.is_empty() {
             return Err(ParseError::new("Must contain command name"))
         }
-        // decide which command handler should be used
         let name = tokens[0];
         let args = &tokens[1..tokens.len()];
         let result = match name {
             "quit" => Self::handle_quit(),
+            "view" => self.handle_view(),
             "move" => self.handle_move(args)?,
             "moves" => self.handle_moves(args)?,
             "profile" => self.handle_profile(args)?,
@@ -90,28 +92,41 @@ impl CommandHandler  {
         exit(1)
     }
 
-    fn handle_move(&self, args: &[&str]) -> ParseResult<String> {
-        if args.len() < 2 {
-            return Err(ParseError::new("Needs at least 2 args"))
+    fn handle_view(&self) -> String {
+        self.current_board.to_notation()
+    }
+
+    fn handle_move(&mut self, args: &[&str]) -> ParseResult<String> {
+        if args.len() < 1 {
+            return Err(ParseError::new("Needs at least 1 args"))
         }
-        // parse the board and the tile move
-        let board = OthelloBoard::from_notation(args[0])?;
-        let mov = Tile::from_str(args[1])?;
+
+        let mov = Tile::from_str(args[0])?;
+        let (board, using_curr) = match args.get(1) {
+            Some(str) => (OthelloBoard::from_notation(str)?, false),
+            None => (self.current_board, true), // copy out for safety
+        };
+        
         // check if the tile is a valid move or not
         if !board.find_current_moves_as_vec().contains(&mov) {
             return Err(ParseError::new("Not a valid move"))
         }
-        // make the new board and send it back
+
         let new_board = board.make_move(mov);
+        if using_curr {
+            self.current_board = new_board
+        }
+
         let result = format!("tile {}", new_board.to_notation());
         Ok(result)
     }
 
     fn handle_moves(&self, args: &[&str]) -> ParseResult<String> {
-        if args.len() < 1 {
-            return Err(ParseError::new("Needs at least 1 args"))
-        }
-        let board = OthelloBoard::from_notation(args[0])?;
+        let board = match args.get(0) {
+            Some(str) => OthelloBoard::from_notation(str)?,
+            None => self.current_board, // copy out for convenience
+        };
+
         // construct a moves output as a space-sep string
         let mut moves_str = String::from("moves ");
         board.find_current_moves(|mov| {
@@ -129,44 +144,54 @@ impl CommandHandler  {
             }
         };
         if level < 1 || level > MAX_LEVEL {
-            return Err(ParseError::new("Level must be between 1 and 8"))
+            static ERR_MSG: LazyLock<String> = std::sync::LazyLock::new(|| format!("Level must be between 1 and {}", MAX_LEVEL));
+            return Err(ParseError::new(ERR_MSG.as_str()))
         }
         Ok(level)
     }
 
     fn handle_profile(&mut self, args: &[&str]) -> ParseResult<String> {
         if args.len() < 2 {
-            return Err(ParseError::new("Needs at least 1 args"))
+            return Err(ParseError::new("Needs at least 2 args"))
         }
-        let level = Self::parse_level(args[0])?;
-        match args[1] {
+        let level = Self::parse_level(args[1])?;
+        match args[0] {
             "log" => {
                 let agent = self.get_agent(level);
-                eprintln!("Logging runs and cache data for agent Level {}", level);
+                eprintln!("Logging runs for agent Level {}", level);
                 agent.profiler.log_runs();
+                Ok(String::from("Logged runs data to stderr"))
+            },
+            "dump" => {
+                let agent = self.get_agent(level);
+                eprintln!("Dumping cache data for agent Level {}", level);
                 agent.cache.dump();
-                Ok(String::from("Logged runs and cache data to stderr"))
+                Ok(String::from("Dumped cache data to stderr"))
             },
             "drop" => {
                 *self.get_optional_agent(level) = None;
                 Ok(String::from(&format!("Dropped agent the Level {}", level)))
             }
-            _ => Err(ParseError::new("Cache flag must be view or drop"))
+            _ => Err(ParseError::new("Profile flag must be dump or drop"))
         }
     }
 
-    fn extract_agent_args(args: &[&str]) -> ParseResult<(usize, OthelloBoard)> {
-        if args.len() < 2 {
-            return Err(ParseError::new("Needs at least 2 args"))
+    fn extract_agent_args(&self, args: &[&str]) -> ParseResult<(usize, OthelloBoard)> {
+        if args.len() < 1 {
+            return Err(ParseError::new("Needs at least 1 args"))
         }
-        let board = OthelloBoard::from_notation(args[0])?;
-        let level = Self::parse_level(args[1])?;
+
+        let level = Self::parse_level(args[0])?;
+        let board = match args.get(1) {
+            Some(str) => OthelloBoard::from_notation(str)?,
+            None => self.current_board, // copy out for convenience
+        };
         Ok((level, board))
     }
 
     fn handle_best_command(&mut self, args: &[&str]) -> ParseResult<String> {
-        let (level, board) = Self::extract_agent_args(args)?;
-        // find the best tile for the board (this takes a long time)
+        let (level, board) = self.extract_agent_args(args)?;
+
         let best_tile = self.get_agent(level).find_best_move(&board);
         let result = match best_tile {
             Some(tile) => format!("tile {}", tile.to_string()),
@@ -176,9 +201,10 @@ impl CommandHandler  {
     }
 
     fn handle_ranked_command(&mut self, args: &[&str]) -> ParseResult<String> {
-        let (level, board) = Self::extract_agent_args(args)?;
-        // find the ranked tiles for the board (this takes a long time)
+        let (level, board) = self.extract_agent_args(args)?;
+        
         let ranked_tiles = self.get_agent(level).find_ranked_moves(&board);
+       
         // add the ranked tiles to a space-sep string as a response
         let mut tiles_str = String::from("tiles ");
         for r in ranked_tiles.iter() {

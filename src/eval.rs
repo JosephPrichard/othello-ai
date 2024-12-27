@@ -11,7 +11,7 @@ const XC_SQUARES: [[i8; 2]; 12] = [
     [7, 1], [7, 6], [1, 0], [1, 7], [6, 0], [6, 7],
 ];
 
-fn parity_heuristic(board: &OthelloBoard) -> f32 {
+fn find_parity_heuristic(board: &OthelloBoard) -> f32 {
     let mut white_score = 0f32;
     let mut black_score = 0f32;
     for tile in TILES {
@@ -26,7 +26,7 @@ fn parity_heuristic(board: &OthelloBoard) -> f32 {
     (black_score - white_score) / (black_score + white_score)
 }
 
-fn corner_heuristic(board: &OthelloBoard) -> f32 {
+fn find_corner_heuristic(board: &OthelloBoard) -> f32 {
     let mut white_corners = 0f32;
     let mut black_corners = 0f32;
     for corner in CORNERS {
@@ -45,7 +45,7 @@ fn corner_heuristic(board: &OthelloBoard) -> f32 {
     }
 }
 
-fn xc_square_heuristic(board: &OthelloBoard) -> f32 {
+fn find_xc_square_heuristic(board: &OthelloBoard) -> f32 {
     let mut white_squares = 0f32;
     let mut black_squares = 0f32;
     for square in XC_SQUARES {
@@ -65,7 +65,7 @@ fn xc_square_heuristic(board: &OthelloBoard) -> f32 {
     }
 }
 
-fn mobility_heuristic(board: &OthelloBoard) -> f32 {
+fn find_mobility_heuristic(board: &OthelloBoard) -> f32 {
     let white_moves = board.count_potential_moves(WHITE) as f32;
     let black_moves = board.count_potential_moves(BLACK) as f32;
     if white_moves + black_moves == 0f32 {
@@ -75,14 +75,14 @@ fn mobility_heuristic(board: &OthelloBoard) -> f32 {
     }
 }
 
-fn stability_heuristic(board: &OthelloBoard) -> f32 {
+fn find_stability_heuristic(board: &OthelloBoard) -> f32 {
     0f32
 }
 
-pub fn heuristic(board: &OthelloBoard) -> f32 {
-    50f32 * parity_heuristic(board)
-        + 100f32 * corner_heuristic(board)
-        + 100f32 * mobility_heuristic(board)
-        + 50f32 * xc_square_heuristic(board)
-        + 100f32 * stability_heuristic(board)
+pub fn find_heuristic(board: &OthelloBoard) -> f32 {
+    50f32 * find_parity_heuristic(board)
+        + 100f32 * find_corner_heuristic(board)
+        + 100f32 * find_mobility_heuristic(board)
+        + 50f32 * find_xc_square_heuristic(board)
+        + 100f32 * find_stability_heuristic(board)
 }

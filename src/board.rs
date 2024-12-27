@@ -187,7 +187,7 @@ impl OthelloBoard {
                 break;
             }
             if c == '/' {
-                // parenthesis means we need to go to the next row
+                // slash means we need to go to the next row
                 row += 1;
                 col = 0;
             } else {
